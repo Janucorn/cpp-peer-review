@@ -5,62 +5,82 @@
 
 using namespace std::literals;
 
-namespace ebook {
+class ReadersManager {
+public:
+	ReadersManager()
+		: pages_to_user_(MAX_USERS + 1, 0)
+		, users_to_page_(MAX_PAGES + 1, 0) {
+	}
+	void AddReader(int user_id, int page);
+	void GetCheer(int user_id);
+	const std::vector<double>& GetStatus() const;
 
-void AddReader(std::vector<int>& users, std::vector<int>& pages, int user_id, int page);
-double Cheer(const std::vector<int>& users, const std::vector<int>& pages, int user);
+private:
+	static const int MAX_USERS = 100'000;
+	static const int MAX_PAGES = 1000;
+	// хранится номер страницы, до которой дочитал пользователь pages_to_user_[n]
+	std::vector<int> pages_to_user_;
+	// хранится количество пользователей, дочитавших до страницы users_to_page[m]
+	std::vector<int> users_to_page_;
+	std::vector<double> status_;
+};
+
+void ReadersManager::AddReader(int user_id, int page) {
+	for (int i = pages_to_user_[user_id] + 1; i <= page; ++i) {
+		++users_to_page_[i];
+	}
+	pages_to_user_[user_id] = page;
 }
 
-double ebook::Cheer(const std::vector<int>& users, const std::vector<int>& pages, int user) {
-	int readed_page = users[user];
-	if (users[user] == 0) {
-		return 0;
+void ReadersManager::GetCheer(int user_id) {
+	int page = pages_to_user_[user_id];
+	if (page == 0) {
+		status_.push_back(0.0);
 	}
 	// если только один пользователь дочитал до текущей страницы
-	if (pages[readed_page] == 1) {
-		return 1;
+	else if (users_to_page_[page] == 1) {
+		status_.push_back(1.0);
+	} else {
+		const int total_users = users_to_page_[1];
+		// из всех читателей оставляем только тех, которые не дочитали до текущей страницы page
+		status_.push_back((total_users - users_to_page_[page]) * 1.0 / (total_users - 1));
 	}
-	// pages[1] - всего читателей
-	// из всех читателей оставляем только тех, которые не дочитали до текущей страницы readed_page
-	return (pages[1] - pages[readed_page]) * 1.0 / (pages[1] - 1);
 }
 
-void ebook::AddReader(std::vector<int>& users, std::vector<int>& pages, int user_id, int page) {
-	for (int i = users[user_id] + 1; i <= page; ++i) {
-			++pages[i];
+const std::vector<double>& ReadersManager::GetStatus() const {
+	return status_;
+}
+
+void ProcessQuery(std::istream& input, ReadersManager& manager) {
+	std::string query;
+	int user_id;
+	input >> query >> user_id;
+	if (query == "CHEER"s) {
+		manager.GetCheer(user_id);
 	}
-	users[user_id] = page;
+	if (query == "READ"s) {
+		int page;
+		input >> page;
+		manager.AddReader(user_id, page);
+	}
+}
+
+void PrintStatus(std::ostream& out, const ReadersManager& manager) {
+	for (const auto& status : manager.GetStatus()) {
+		out << std::setprecision(6) << status << std::endl;
+	}
 }
 
 int main() {
+	ReadersManager manager;
 	int count;
 	std::cin >> count;
-	static const int MAX_USERS = 100'000;
-	static const int MAX_PAGES = 1000;
-	// хранится номер страницы, до которой дочитал пользователь users[n]
-	std::vector<int> users(MAX_USERS + 1);
-	// хранится количество пользователей, дочитавших до страницы pages[m]
-	std::vector<int> pages(MAX_PAGES + 1);
-	std::vector<double> result;
 
 	for (int i = 0; i < count; ++i) {
-		std::string query;
-		int user_id;
-		std::cin >> query >> user_id;
-		if (query == "CHEER"s) {
-			result.push_back(ebook::Cheer(users, pages, user_id));
-		}
-		if (query == "READ"s) {
-			int page;
-			std::cin >> page;
-			ebook::AddReader(users, pages, user_id, page);
-		}
+		ProcessQuery(std::cin, manager);
 	}
 
-	for (const auto& res : result) {
-		std::cout << std::setprecision(6) << res << std::endl;
-	}
-
+	PrintStatus(std::cout, manager);
 }
 /*
 INPUT:				OUTPUT
